@@ -41,10 +41,15 @@ const (
 
 // New returns a new GenericSync that cna be started.
 func New(kubeconfig *rest.Config, opa opa_client.Data, ns types.ResourceType) *GenericSync {
+	opaPrefix := ns.Resource
+	if ns.Namespace != "" {
+		opaPrefix = fmt.Sprintf("%s/%s", ns.Resource, ns.Namespace)
+	}
+
 	return &GenericSync{
 		kubeconfig: kubeconfig,
 		ns:         ns,
-		opa:        opa.Prefix(ns.Resource),
+		opa:        opa.Prefix(opaPrefix),
 	}
 }
 
