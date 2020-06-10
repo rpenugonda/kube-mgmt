@@ -275,7 +275,7 @@ func (s *GenericSync) objPath(obj runtime.Object) (string, error) {
 	}
 	name := m.GetName()
 	var path string
-	if s.ns.Namespaced {
+	if s.ns.Namespaced && s.ns.Namespace == "" {
 		path = m.GetNamespace() + "/" + name
 	} else {
 		path = name
