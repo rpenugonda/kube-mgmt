@@ -140,12 +140,16 @@ func (s *GenericSync) sync(resource dynamic.NamespaceableResourceInterface, quit
 
 	logrus.Infof("Syncing %v.", s.ns)
 	tList := time.Now()
-	result, err := resource.List(metav1.ListOptions{})
+
+	var result *unstructured.UnstructuredList
+	var err error
 
 	if s.ns.Namespace != "" {
 		result, err = resource.List(metav1.ListOptions{
 			FieldSelector: fmt.Sprintf("metadata.namespace=%s", s.ns.Namespace),
 		})
+	} else {
+		result, err = resource.List(metav1.ListOptions{})
 	}
 
 	if err != nil {
@@ -163,14 +167,15 @@ func (s *GenericSync) sync(resource dynamic.NamespaceableResourceInterface, quit
 	dLoad := time.Since(tLoad)
 	logrus.Infof("Loaded %v resources into OPA. Took %v. Starting watch at resourceVersion %v.", s.ns, dLoad, resourceVersion)
 
-	w, err := resource.Watch(metav1.ListOptions{
-		ResourceVersion: resourceVersion,
-	})
-
+	var w watch.Interface
 	if s.ns.Namespace != "" {
 		w, err = resource.Watch(metav1.ListOptions{
 			ResourceVersion: resourceVersion,
 			FieldSelector:   fmt.Sprintf("metadata.namespace=%s", s.ns.Namespace),
+		})
+	} else {
+		w, err = resource.Watch(metav1.ListOptions{
+			ResourceVersion: resourceVersion,
 		})
 	}
 
