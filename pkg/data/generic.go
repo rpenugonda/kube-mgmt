@@ -41,10 +41,15 @@ const (
 
 // New returns a new GenericSync that cna be started.
 func New(kubeconfig *rest.Config, opa opa_client.Data, ns types.ResourceType) *GenericSync {
+	opaPrefix := ns.Resource
+	if ns.Namespace != "" {
+		opaPrefix = fmt.Sprintf("%s/%s", ns.Resource, ns.Namespace)
+	}
+
 	return &GenericSync{
 		kubeconfig: kubeconfig,
 		ns:         ns,
-		opa:        opa.Prefix(ns.Resource),
+		opa:        opa.Prefix(opaPrefix),
 	}
 }
 
@@ -135,7 +140,18 @@ func (s *GenericSync) sync(resource dynamic.NamespaceableResourceInterface, quit
 
 	logrus.Infof("Syncing %v.", s.ns)
 	tList := time.Now()
-	result, err := resource.List(metav1.ListOptions{})
+
+	var result *unstructured.UnstructuredList
+	var err error
+
+	if s.ns.Namespace != "" {
+		result, err = resource.List(metav1.ListOptions{
+			FieldSelector: fmt.Sprintf("metadata.namespace=%s", s.ns.Namespace),
+		})
+	} else {
+		result, err = resource.List(metav1.ListOptions{})
+	}
+
 	if err != nil {
 		return errKubernetes(errors.Wrap(err, "list"))
 	}
@@ -145,17 +161,24 @@ func (s *GenericSync) sync(resource dynamic.NamespaceableResourceInterface, quit
 	logrus.Infof("Listed %v and got %v resources with resourceVersion %v. Took %v.", s.ns, len(result.Items), resourceVersion, dList)
 
 	tLoad := time.Now()
-
 	if err := s.syncAll(result.Items); err != nil {
 		return errOPA(errors.Wrap(err, "reset"))
 	}
-
 	dLoad := time.Since(tLoad)
 	logrus.Infof("Loaded %v resources into OPA. Took %v. Starting watch at resourceVersion %v.", s.ns, dLoad, resourceVersion)
 
-	w, err := resource.Watch(metav1.ListOptions{
-		ResourceVersion: resourceVersion,
-	})
+	var w watch.Interface
+	if s.ns.Namespace != "" {
+		w, err = resource.Watch(metav1.ListOptions{
+			ResourceVersion: resourceVersion,
+			FieldSelector:   fmt.Sprintf("metadata.namespace=%s", s.ns.Namespace),
+		})
+	} else {
+		w, err = resource.Watch(metav1.ListOptions{
+			ResourceVersion: resourceVersion,
+		})
+	}
+
 	if err != nil {
 		return errKubernetes(errors.Wrap(err, "watch"))
 	}
@@ -236,7 +259,7 @@ func (s *GenericSync) generateSyncPayload(objs []unstructured.Unstructured) (map
 		// sync'd with the GenericSync instance.
 		segments := strings.Split(objPath, "/")
 		dir := combined
-		for i := 0; i < len(segments) -1; i++ {
+		for i := 0; i < len(segments)-1; i++ {
 			next, ok := combined[segments[i]]
 			if !ok {
 				next = map[string]interface{}{}
@@ -244,7 +267,7 @@ func (s *GenericSync) generateSyncPayload(objs []unstructured.Unstructured) (map
 			}
 			dir = next.(map[string]interface{})
 		}
-		dir[segments[len(segments) -1]] = obj.Object
+		dir[segments[len(segments)-1]] = obj.Object
 	}
 
 	return combined, nil
@@ -257,7 +280,7 @@ func (s *GenericSync) objPath(obj runtime.Object) (string, error) {
 	}
 	name := m.GetName()
 	var path string
-	if s.ns.Namespaced {
+	if s.ns.Namespaced && s.ns.Namespace == "" {
 		path = m.GetNamespace() + "/" + name
 	} else {
 		path = name

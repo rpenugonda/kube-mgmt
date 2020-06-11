@@ -14,6 +14,7 @@ type ResourceType struct {
 	Resource   string
 	Group      string
 	Version    string
+	Namespace  string
 }
 
 func (t ResourceType) String() string {

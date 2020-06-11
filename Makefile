@@ -1,7 +1,7 @@
 BIN := kube-mgmt
 PKG := github.com/open-policy-agent/kube-mgmt
-REGISTRY ?= openpolicyagent
-VERSION := 0.12-dev
+REGISTRY ?= docker-conveyor.groupondev.com/conveyor-cloud
+VERSION := 0.11-ns_patch
 ARCH := amd64
 COMMIT := $(shell ./build/get-build-commit.sh)
 

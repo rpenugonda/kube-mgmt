@@ -151,10 +151,20 @@ func loadRESTConfig(path string) (*rest.Config, error) {
 }
 
 func getResourceType(gvk groupVersionKind, namespaced bool) types.ResourceType {
+	Namespace := ""
+	Kind := ""
+	if namespaced && strings.Contains(gvk.Kind, "@") {
+		Kind = strings.Split(gvk.Kind, "@")[0]
+		Namespace = strings.Split(gvk.Kind, "@")[1]
+	} else {
+		Kind = gvk.Kind
+		Namespace = ""
+	}
 	return types.ResourceType{
 		Namespaced: namespaced,
 		Group:      gvk.Group,
 		Version:    gvk.Version,
-		Resource:   gvk.Kind,
+		Resource:   Kind,
+		Namespace:  Namespace,
 	}
 }
